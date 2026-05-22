@@ -1,6 +1,10 @@
-# healthcare-voice-agent-demo
+# Healthcare Voice Agent Demo
 
-A tiny spoken healthcare Q&A prototype:
+A small prototype voice agent pipeline for spoken healthcare Q&A. It accepts an
+audio question, transcribes it with open-source Whisper, sends the transcript
+through an LLM reasoning step, and returns a spoken answer through local TTS.
+The goal is to demonstrate the core building blocks of a voice healthcare
+assistant in a minimal, inspectable Python project.
 
 ```text
 Audio file -> Whisper ASR -> LLM reasoning step -> pyttsx3 TTS
@@ -9,6 +13,13 @@ Audio file -> Whisper ASR -> LLM reasoning step -> pyttsx3 TTS
 This is a demo pipeline, not medical advice software. The assistant prompt is
 intentionally conservative: it avoids diagnosis, encourages clinician follow-up,
 and escalates red-flag symptoms.
+
+## Features
+
+- Open-source Whisper ASR wrapper for audio transcription
+- LLM reasoning step with Ollama, OpenAI, or OpenAI-compatible APIs
+- Local text-to-speech output with pyttsx3
+- Small dependency-injected pipeline with fast unit tests
 
 ## Install
 
