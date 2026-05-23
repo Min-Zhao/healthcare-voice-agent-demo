@@ -9,6 +9,8 @@ env/
 .env
 .DS_Store
 outputs/
+external/
+ckpt/
 *.wav
 *.mp3
 *.m4a

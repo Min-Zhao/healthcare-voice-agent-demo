@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
+import sys
 from typing import Any, Protocol
 from urllib import request
 
@@ -45,7 +46,7 @@ class HealthcareVoicePipeline:
     def run(self, audio_path: Path, output_path: Path | None = None) -> PipelineResult:
         transcript = self._transcriber.transcribe(audio_path)
         if not transcript:
-            raise ValueError("Whisper returned an empty transcript.")
+            raise ValueError("The ASR backend returned an empty transcript.")
         answer = self._reasoner.answer(transcript)
         if not answer:
             raise ValueError("The LLM returned an empty answer.")
@@ -75,11 +76,53 @@ class WhisperTranscriber:
             except ImportError as exc:
                 raise RuntimeError(
                     "Install the voice demo dependencies with "
-                    "`python3 -m pip install -r requirements-voice.txt`."
+                    "`python3 -m pip install -r requirements.txt`."
                 ) from exc
             self._model = whisper.load_model(self._model_name)
         result = self._model.transcribe(str(audio_path))
         return str(result.get("text", "")).strip()
+
+
+class MegaASRTranscriber:
+    """Mega-ASR wrapper for robust in-the-wild speech recognition.
+
+    Mega-ASR is not a simple PyPI package today. Install the official codebase
+    and download the checkpoint separately, then point this wrapper at both.
+    """
+
+    def __init__(
+        self,
+        ckpt_dir: Path,
+        code_path: Path | None = None,
+        routing_enabled: bool = True,
+    ):
+        self._ckpt_dir = ckpt_dir
+        self._code_path = code_path
+        self._routing_enabled = routing_enabled
+        self._model: Any | None = None
+
+    def transcribe(self, audio_path: Path) -> str:
+        if self._model is None:
+            if self._code_path is not None:
+                sys.path.insert(0, str(self._code_path))
+            try:
+                from MegaASR.model.megaASR import MegaASR
+            except ImportError as exc:
+                raise RuntimeError(
+                    "Mega-ASR is optional. Clone/install the official Mega-ASR "
+                    "codebase and pass --mega-asr-code-path if it is not on "
+                    "PYTHONPATH."
+                ) from exc
+
+            model_path = self._ckpt_dir / "Qwen3-ASR-1.7B"
+            router_checkpoint = self._ckpt_dir / "audio_quality_router" / "best_acc_model.pt"
+            self._model = MegaASR(
+                model_path=str(model_path),
+                router_checkpoint=str(router_checkpoint),
+                routing_enabled=self._routing_enabled,
+            )
+        result = self._model.infer(str(audio_path), return_route=True)
+        return _extract_transcript(result)
 
 
 class OpenAICompatibleReasoner:
@@ -156,7 +199,7 @@ class Pyttsx3Speaker:
         except ImportError as exc:
             raise RuntimeError(
                 "Install the voice demo dependencies with "
-                "`python3 -m pip install -r requirements-voice.txt`."
+                "`python3 -m pip install -r requirements.txt`."
             ) from exc
         engine = pyttsx3.init()
         if self._rate is not None:
@@ -186,3 +229,22 @@ def _post_json(
     )
     with request.urlopen(req, timeout=120) as response:
         return json.loads(response.read().decode("utf-8"))
+
+
+def _extract_transcript(result: Any) -> str:
+    if isinstance(result, str):
+        return result.strip()
+    if isinstance(result, dict):
+        for key in ("text", "transcript", "transcription", "answer", "result"):
+            value = result.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        for value in result.values():
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    if isinstance(result, (list, tuple)):
+        for value in result:
+            transcript = _extract_transcript(value)
+            if transcript:
+                return transcript
+    return ""

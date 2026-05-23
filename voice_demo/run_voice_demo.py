@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .pipeline import (
     HealthcareVoicePipeline,
+    MegaASRTranscriber,
     OllamaReasoner,
     OpenAICompatibleReasoner,
     Pyttsx3Speaker,
@@ -27,12 +28,46 @@ def build_reasoner(args):
     raise ValueError(f"Unsupported LLM provider: {args.llm_provider}")
 
 
+def build_transcriber(args):
+    if args.asr_provider == "whisper":
+        return WhisperTranscriber(model_name=args.whisper_model)
+    if args.asr_provider == "mega-asr":
+        return MegaASRTranscriber(
+            ckpt_dir=args.mega_asr_ckpt_dir,
+            code_path=args.mega_asr_code_path,
+            routing_enabled=args.mega_asr_routing,
+        )
+    raise ValueError(f"Unsupported ASR provider: {args.asr_provider}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Run a tiny Whisper -> LLM -> pyttsx3 voice healthcare Q&A demo."
+        description="Run an ASR -> LLM -> pyttsx3 voice healthcare Q&A demo."
     )
-    parser.add_argument("audio", type=Path, help="Input audio file for Whisper ASR.")
+    parser.add_argument("audio", type=Path, help="Input audio file for ASR.")
+    parser.add_argument(
+        "--asr-provider",
+        choices=["whisper", "mega-asr"],
+        default="whisper",
+    )
     parser.add_argument("--whisper-model", default="base")
+    parser.add_argument(
+        "--mega-asr-ckpt-dir",
+        type=Path,
+        default=Path("ckpt/Mega-ASR"),
+        help="Mega-ASR checkpoint directory containing Qwen3-ASR-1.7B and router files.",
+    )
+    parser.add_argument(
+        "--mega-asr-code-path",
+        type=Path,
+        help="Optional path to the cloned Mega-ASR codebase if not installed.",
+    )
+    parser.add_argument(
+        "--mega-asr-routing",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Use Mega-ASR's audio quality router when available.",
+    )
     parser.add_argument(
         "--llm-provider",
         choices=["ollama", "openai", "openai-compatible"],
@@ -50,7 +85,7 @@ def main() -> int:
     args = parser.parse_args()
 
     pipeline = HealthcareVoicePipeline(
-        transcriber=WhisperTranscriber(model_name=args.whisper_model),
+        transcriber=build_transcriber(args),
         reasoner=build_reasoner(args),
         speaker=Pyttsx3Speaker(rate=args.tts_rate),
     )

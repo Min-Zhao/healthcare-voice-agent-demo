@@ -5,6 +5,7 @@ import tempfile
 import unittest
 
 from voice_demo import HealthcareVoicePipeline
+from voice_demo.pipeline import _extract_transcript
 
 
 class FakeTranscriber:
@@ -46,6 +47,11 @@ class VoicePipelineTest(unittest.TestCase):
         self.assertEqual(result.answer, "Chest pain can be urgent. Seek emergency care now.")
         self.assertEqual(speaker.text, result.answer)
         self.assertEqual(result.spoken_output, output_path)
+
+    def test_extract_transcript_handles_mega_asr_result_shapes(self):
+        self.assertEqual(_extract_transcript("hello"), "hello")
+        self.assertEqual(_extract_transcript({"text": "hello"}), "hello")
+        self.assertEqual(_extract_transcript(({"transcription": "hello"}, "robust")), "hello")
 
 
 if __name__ == "__main__":

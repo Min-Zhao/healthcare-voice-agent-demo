@@ -1,5 +1,6 @@
 from .pipeline import (
     HealthcareVoicePipeline,
+    MegaASRTranscriber,
     OllamaReasoner,
     OpenAICompatibleReasoner,
     PipelineResult,
@@ -9,6 +10,7 @@ from .pipeline import (
 
 __all__ = [
     "HealthcareVoicePipeline",
+    "MegaASRTranscriber",
     "OllamaReasoner",
     "OpenAICompatibleReasoner",
     "PipelineResult",
